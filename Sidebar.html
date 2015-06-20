@@ -1,0 +1,367 @@
+<!-- Project Name: TTRPG Clock Manager
+File Purpose and Name: Interface: Sidebar.html
+Author: Jonathan Williamson http://Resume.JonathanWilliamson.info
+
+This interface displays and allows the user to edit the values of a clock when aided by a 
+server-side library in Google Apps Script (a variant of JavaScript). Unlike most clocks, this clock 
+is meant to be used as a counter that does not follow the flow of real time. That is, the clock 
+only increases when you tell it to do so. The intent of this kind of clock is for use in a tabletop 
+RPG game where the flow of "in-game" time does not follow real time, instead only increasing when 
+the game master says it should (and only in the increments that the game master says should 
+happen). The values of the clock are stored in spreadsheet cells, thus enabling the clock to be 
+accessed asynchronously by the spreadsheet owner (the game master) on the fly without having to 
+open up the script editor. 
+
+To set it up, there must be a sheet in the spreadsheet where cells B2:B14 are reserved. Chiefly, 
+these cells store the day, hour, minute, and second as integers. The name of this sheet can be 
+whatever you want, but you must store the name of this sheet in the Script Properties of the Google 
+Apps Script inside the script editor, inside a custom property named "SheetValues". Once this is 
+saved, you have to authorize the script to make it function properly (by doing something where the 
+Google Apps Script must be authorized to accomplish that task).
+
+This interface is paired with a Google Apps Script Library which hsndles the functions that are 
+best run server-side. This particular file displays the clock in string form and can submit 
+singular and custom increments of the clock.
+
+As this is a sidebar, certain segments of a normal HTML file are intentionally missing.
+-->
+
+<style>
+
+* {
+  font-family: Arial, Helvetica;
+  font-size: 18px;
+  color: black;
+  padding: 0;
+  margin: 0;
+}
+
+h2 {
+  display: block;
+  font-family: Courier, Monospace;
+  font-size: 24px;
+  color: black;
+  width: 95%;
+  border: 3px solid red;
+  padding: 3px;
+  margin: 1px auto;
+  text-align: center;
+}
+
+h1,label,input[type="button"],input[type="submit"] {
+  padding: 2px 5px;
+  font-weight: bold;
+  font-variant: small-caps;
+  text-align: center;
+}
+
+input[type="text"] {
+  font-family: Courier, Monospace;
+  text-align: center;
+  width: 75%;
+}
+
+div.row {
+  width: 100%;
+  min-height: 40px;
+  clear: both;
+}
+
+div.row>div.onecolumn {
+  width: 100%;
+}
+
+div.row>div.twocolumn {
+  width: 48%;
+}
+
+div.row>div.fleft {
+  float: left;
+}
+
+div.row>div.fright {
+  float: right;
+}
+
+div#body {
+  width: 280px;
+  margin: 0px auto;
+}
+
+label {
+  margin: 5px auto 0px;
+  text-align: center;
+}
+
+div.row label {
+  display: block;
+  width: 100%;
+}
+
+input[type="button"]#closeButton {
+  display: block;
+  width: 100%;
+}
+
+input[type="button"][disabled] {
+  display: none;
+}
+
+div.row input {
+  display: block;
+  margin: 5px auto 5px;
+}
+
+div.separator {
+  width: 100%;
+  height: 0px;
+  min-height: 0px;
+  border: 1px solid gray;
+  margin: 5px 0px;
+}
+
+</style>
+
+<div id="body">
+
+<div class="row">
+
+<div class="onecolumn">
+<input id="refresh" type="button" value="Refresh Readouts"
+    onclick="updateReadouts()" />
+</div>
+
+</div> <!-- row -->
+
+<div class="row separator"></div>
+
+<h1>Current In-Game Time</h1>
+<h2 id="clockString">Loading...</h1>
+
+<div class="row separator"></div>
+
+<h1>Standard Increments</h1>
+<div class="row">
+<div class="twocolumn fleft">
+<input id="IncRound" type="button" value="Inc Round" disabled
+    onclick="buttonHandler_IncRound()" />
+</div>
+<div class="twocolumn fright">
+<input id="IncMinute" type="button" value="Inc Minute"
+    onclick="buttonHandler_IncMinute()" />
+</div>
+</div> <!-- row -->
+
+<div class="row">
+<div class="twocolumn fleft">
+<input id="IncHour" type="button" value="Inc Hour"
+    onclick="buttonHandler_IncHour()" />
+</div>
+<div class="twocolumn fright">
+<input id="IncDay" type="button" value="Inc Day"
+    onclick="buttonHandler_IncDay()" />
+</div>
+</div> <!-- row -->
+
+<div class="separator"></div>
+
+<form name="customIncrement" onsubmit="return buttonHandler_customIncrement(this)" autocomplete="off" action="" method="get">
+<div class="row">
+<label for="inc_custom">Custom Increment</label>
+<div class="twocolumn fleft">
+  <input type="text" name="inc_custom" placeholder="hh:mm:ss">
+</div>
+<div class="twocolumn fright">
+<input type="submit" value="Submit">
+</div>
+</div> <!-- row -->
+</form>
+
+<div class="row separator"></div>
+
+<h1>Combat Timer</h1>
+<h2 id="combatTimer">Not in Combat</h1>
+<div class="row">
+
+<div class="twocolumn fleft">
+<input id="combatTimerIncRound" type="button" value="Inc Round" disabled
+    onclick="buttonHandler_IncRound()" />
+</div>
+
+<div class="twocolumn fright">
+<input id="combatTimerStart" type="button" value="Start Combat" disabled
+    onclick="buttonHandler_combatTimerStart()" />
+<input id="combatTimerEnd" type="button" value="End Combat" disabled
+    onclick="buttonHandler_combatTimerEnd()" />
+</div>
+
+</div> <!-- row -->
+
+<div class="row separator"></div>
+
+</div> <!-- body -->
+
+<script>
+  
+updateReadouts(); // Initialize the sidebar readouts.
+    
+google.script.run // Run a Google Apps Script
+  .withSuccessHandler(enableButtons) // Where the return value is sent to a success handler
+  .getCombatRound(); // in which you check for whether you're curently in combat.
+
+// This function is a success handler that receives a return value and its owning tag.
+// It then enables buttons based on the return value.
+function enableButtons(result, tag) {
+
+  if ( result == "Not in Combat" ) {
+    document.getElementById('combatTimerStart').disabled = false;
+  }
+  else {
+    document.getElementById('combatTimerEnd').disabled = false;
+    document.getElementById('IncRound').disabled = false;
+    document.getElementById('combatTimerIncRound').disabled = false;
+  }
+}
+
+// This function is a success handler that receives a return value and its owning tag.
+// It then updates the contents of a tag based on the return value.
+function updateContents(contents, tag) {
+  
+  tag.innerHTML = contents;
+  
+  return "Test successful!";
+}
+
+// This function pre-validates a custom clock increment that was input by the user.
+// If there is a validation error, it reports the error via Google Apps Script dialog box.
+// If there are no errors, it sends the pre-validated increment to the server-side script.
+function validateCustomIncrement() {
+  
+  var x = document.forms["customIncrement"]["inc_custom"].value; // get the data
+  var y = x.split(":"); // split the data
+  if ( x == null || x == "" ) {
+    google.script.run.showDialog(
+      "Error", "You forgot to write something.", 
+      "The custom increment field must be filled out before submitting it. " + 
+      "The correct format for a custom increment is <code>hh:mm:ss</code> or shorter such as <code>m:s</code> or <code>h::</code> .",
+      200);
+  }
+  else if (
+      y.length > 3 ||
+      ( y.length == 1 && isNaN(y[0]) ) ||
+      ( y.length == 2 && ( isNaN(y[0]) || isNaN(y[1]) ) ) ||
+      ( y.length == 3 && ( isNaN(y[0]) || isNaN(y[1]) || isNaN(y[2]) ) ) ) {
+    document.forms["customIncrement"]["inc_custom"].value = ""; // clear the field immediately to reduce the possibility of a race condition.
+    google.script.run.showDialog(
+      "Error", "Invalid format", 
+      "The correct format for a custom increment is <code>hh:mm:ss</code> or shorter such as <code>m:s</code> or <code>h::</code> .");
+  }
+  else { // if all validation is cleared
+    var h = 0; var m = 0; var s = 0; // set default values
+    if ( y.length == 1 ) { // if only seconds are being incremented
+      s = Math.floor(Math.abs(Number(y[0])));
+    }
+    else if ( y.length == 2 ) { // if only minutes and seconds are being incremented
+      m = Math.floor(Math.abs(Number(y[0])));
+      s = Math.floor(Math.abs(Number(y[1])));
+    }
+    else if ( y.length == 3 ) { // if hours, minutes, and seconds are being incremented
+      h = Math.floor(Math.abs(Number(y[0])));
+      m = Math.floor(Math.abs(Number(y[1])));
+      s = Math.floor(Math.abs(Number(y[2])));
+    }
+    document.forms["customIncrement"]["inc_custom"].value = ""; // clear the field immediately to reduce the possibility of a race condition.
+    google.script.run.inc_custom(h,m,s);
+  }
+  return false; // Never let the form actually "submit", as that'll cause the page to go to a different URL.
+}
+
+// This function updates the readouts in the interface.
+// This is not done based on a timer because the # of script executions allowed per day is limited.
+function updateReadouts() {
+  
+  var gs = google.script.run.withSuccessHandler(updateContents);
+  gs.withUserObject(document.getElementById("clockString"))
+    .getClockString();
+  gs.withUserObject(document.getElementById("combatTimer"))
+    .getCombatRound();
+  return false;
+}
+
+// This function triggers when the singular round increment button is clicked.
+function buttonHandler_IncRound() {
+
+  document.getElementById('IncRound').disabled = true;
+  document.getElementById('combatTimerIncRound').disabled = true;
+  
+  google.script.run.inc_round();
+  while(updateReadouts()) {};
+  
+  document.getElementById('IncRound').disabled = false;
+  document.getElementById('combatTimerIncRound').disabled = false;
+}
+
+// This function triggers when the singular minute increment button is clicked.
+function buttonHandler_IncMinute() {
+  
+  document.getElementById('IncMinute').disabled = true;
+  
+  google.script.run.inc_minute();
+  while(updateReadouts()) {};
+  
+  document.getElementById('IncMinute').disabled = false;
+}
+
+// This function triggers when the singular hour increment button is clicked.
+function buttonHandler_IncHour() {
+  
+  document.getElementById('IncHour').disabled = true;
+  
+  google.script.run.inc_hour();
+  while(updateReadouts()) {};
+  
+  document.getElementById('IncHour').disabled = false;
+}
+
+// This function triggers when the singular day increment button is clicked.
+function buttonHandler_IncDay () {
+  
+  document.getElementById('IncDay').disabled = true;
+  
+  google.script.run.inc_day();
+  while(updateReadouts()) {};
+  
+  document.getElementById('IncDay').disabled = false;
+}
+
+// This function triggers when the custom increment button is clicked.
+function buttonHandler_customIncrement() {
+  
+  validateCustomIncrement();
+  updateReadouts();
+  return false; // Never let the form actually "submit", as that'll cause the sidebar "page" to go to a different URL.
+}
+
+// This function triggers when the start combat button is clicked.
+function buttonHandler_combatTimerStart() {
+  
+  google.script.run.startCombat();
+  document.getElementById('combatTimerStart').disabled = true;
+  document.getElementById('combatTimerEnd').disabled = false;
+  document.getElementById('IncRound').disabled = false;
+  document.getElementById('combatTimerIncRound').disabled = false;
+  updateReadouts();
+}
+
+// This function triggers when the end combat button is clicked.
+function buttonHandler_combatTimerEnd() {
+  
+  google.script.run.endCombat();
+  document.getElementById('combatTimerStart').disabled = false;
+  document.getElementById('combatTimerEnd').disabled = true;
+  document.getElementById('IncRound').disabled = true;
+  document.getElementById('combatTimerIncRound').disabled = true;
+  updateReadouts();
+}
+
+</script>

@@ -1,0 +1,112 @@
+<!-- Project Name: TTRPG Clock Manager
+File Purpose and Name: Dialog Box Interface: Dialog.html
+Author: Jonathan Williamson http://Resume.JonathanWilliamson.info
+
+This interface displays a dialog box meant to receive a title, topic, details, height, and width. 
+Title = The title of the dialog box object itself.
+Topic = The specific topic relevant to the dialog box.
+Details = The details relevant to the dialog box, formatted in basic HTML code (sanitized).
+Height = The pixel height of the dialog box.
+Width = The pixel width of the dialog box.
+
+This interface is paired with a Google Apps Script Library which hsndles the functions that are 
+best run server-side. This particular file displays the dialog box itself within the Google Apps 
+Script framework.
+
+As this is a dialog box, certain segments of a normal HTML file are intentionally missing.
+-->
+
+<style>
+
+* {
+  font-family: Arial, Helvetica;
+  font-size: 14px;
+  color: black;
+  padding: 0;
+  margin: 0;
+}
+
+h1 {
+  display: block;
+  font-size: 18px;
+  color: black;
+  padding: 3px;
+  margin: 1px auto;
+  text-align: center;
+}
+
+code {
+  font-family: Courier, Monospace;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+input[type="button"] {
+  font-weight: bold;
+  font-variant: small-caps;
+}
+
+div.row {
+  clear: both;
+}
+
+div.row>div.twocolumn {
+  width: 48%;
+}
+
+div.row>div.fleft {
+  float: left;
+}
+
+div.row>div.fright {
+  float: right;
+}
+
+div.row>div.fleft,div.fright>div {
+  margin: 0px auto;
+}
+
+div#body {
+  width: 100%;
+}
+
+input[type="button"]#closeButton {
+  display: block;
+  width: 100%;
+  margin-top: 15px;
+}
+
+div.row input {
+  display: block;
+  margin: 0px auto;
+}
+
+</style>
+
+<div id="body">
+
+<h1 id="dialogTopic"></h1>
+
+<div id="dialogDetails"></div>
+
+<input id="closeButton" type="button" value="Close" onclick="google.script.host.close()" />
+
+</div>
+
+<script>
+
+function updateContents(contents, tag) {
+  tag.innerHTML = contents;
+}
+
+google.script.run
+  .withSuccessHandler(updateContents)
+  .withUserObject(document.getElementById("dialogTopic"))
+  .getDialogTopic();
+
+google.script.run
+  .withSuccessHandler(updateContents)
+  .withUserObject(document.getElementById("dialogDetails"))
+  .getDialogDetails();
+
+</script>
